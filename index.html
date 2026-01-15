@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Tree</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <h2>Family Tree Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit">Login</button>
+                <div id="loginError" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="main-app" style="display: none;">
+        <header>
+            <h1>Family Tree</h1>
+            <div class="header-controls">
+                <button id="exportBtn" class="btn btn-secondary">Export Data</button>
+                <button id="importBtn" class="btn btn-secondary">Import Data</button>
+                <button id="logoutBtn" class="btn btn-danger">Logout</button>
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- Controls -->
+            <div class="controls">
+                <button id="expandAllBtn" class="btn">Expand All</button>
+                <button id="collapseAllBtn" class="btn">Collapse All</button>
+                <button id="resetZoomBtn" class="btn">Reset View</button>
+            </div>
+
+            <!-- Tree Container -->
+            <div id="treeContainer" class="tree-container">
+                <div id="treeCanvas" class="tree-canvas"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing Person -->
+    <div id="personModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Add Person</h2>
+            <form id="personForm">
+                <div class="form-group">
+                    <label for="personName">Name:</label>
+                    <input type="text" id="personName" required>
+                </div>
+                <div class="form-group">
+                    <label for="personBirthDate">Birth Date:</label>
+                    <input type="date" id="personBirthDate">
+                </div>
+                <div class="form-group">
+                    <label for="personGender">Gender:</label>
+                    <select id="personGender">
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="personPhoto">Photo:</label>
+                    <input type="file" id="personPhoto" accept="image/*">
+                    <div id="photoPreview" class="photo-preview"></div>
+                </div>
+                <div class="form-group">
+                    <label for="personNotes">Notes:</label>
+                    <textarea id="personNotes" rows="3"></textarea>
+                </div>
+                <div class="form-buttons">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" id="cancelBtn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Hidden file input for import -->
+    <input type="file" id="importFile" accept=".json" style="display: none;">
+
+    <!-- Firebase SDK - Only App and Firestore needed (photos stored as base64) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <script src="script.js"></script>
+</body>
+</html>
