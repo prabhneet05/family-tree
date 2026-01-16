@@ -535,20 +535,35 @@ function resetView() {
     const container = document.getElementById('treeContainer');
     const canvas = document.getElementById('treeCanvas');
     
-    // Reset scroll position
-    container.scrollTop = 0;
+    // Expand all nodes first to get accurate dimensions
+    Object.keys(familyData.members).forEach(id => {
+        familyData.members[id].collapsed = false;
+    });
     
-    // Center horizontally
-    const containerWidth = container.clientWidth;
-    const canvasWidth = canvas.scrollWidth;
+    // Re-render the tree
+    renderTree();
     
-    if (canvasWidth > containerWidth) {
-        // If content is wider than container, center it
-        container.scrollLeft = (canvasWidth - containerWidth) / 2;
-    } else {
-        // If content fits, scroll to left
-        container.scrollLeft = 0;
-    }
+    // Wait for render to complete, then center
+    setTimeout(() => {
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const canvasWidth = canvas.scrollWidth;
+        const canvasHeight = canvas.scrollHeight;
+        
+        // Center horizontally
+        if (canvasWidth > containerWidth) {
+            container.scrollLeft = (canvasWidth - containerWidth) / 2;
+        } else {
+            container.scrollLeft = 0;
+        }
+        
+        // Center vertically
+        if (canvasHeight > containerHeight) {
+            container.scrollTop = (canvasHeight - containerHeight) / 2;
+        } else {
+            container.scrollTop = 0;
+        }
+    }, 100);
 }
 
 // ====================================================================
