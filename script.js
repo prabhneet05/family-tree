@@ -533,7 +533,6 @@ function createPersonCard(person) {
     deleteBtn.style.background = '#dc3545';
     
     // Add "Delete All" button if person has descendants
-    const children = getChildren(person.id);
     if (children.length > 0) {
         const deleteAllBtn = createButton('Delete + Descendants', () => {
             if (confirm(`Delete "${person.name}" and ALL their descendants?\n\nThis will delete ${countAllDescendants(person.id) + 1} people total.\n\nThis action cannot be undone.`)) {
