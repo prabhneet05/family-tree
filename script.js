@@ -17,17 +17,22 @@ const firebaseConfig = {
 let db = null;
 let isFirebaseConfigured = false;
 
-try {
-    if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        isFirebaseConfigured = true;
-        console.log('✅ Firebase connected - Cloud storage enabled');
-    } else {
-        console.warn('⚠️ Firebase not configured - Using local storage only');
+// Wait for Firebase to load before initializing
+if (typeof firebase !== 'undefined') {
+    try {
+        if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            isFirebaseConfigured = true;
+            console.log('✅ Firebase connected - Cloud storage enabled');
+        } else {
+            console.warn('⚠️ Firebase not configured - Using local storage only');
+        }
+    } catch (error) {
+        console.warn('⚠️ Firebase initialization failed - Using local storage only:', error);
     }
-} catch (error) {
-    console.warn('⚠️ Firebase initialization failed - Using local storage only:', error);
+} else {
+    console.warn('⚠️ Firebase SDK not loaded - Using local storage only');
 }
 
 // ====================================================================
@@ -55,6 +60,7 @@ let modalAction = null;
 let parentIdForNew = null;
 let relationshipType = null;
 let familyTreeId = 'default'; // Can be changed to support multiple families
+let zoomLevel = 1.0; // Current zoom level
 
 // ====================================================================
 // APP INITIALIZATION
@@ -80,6 +86,8 @@ function setupEventListeners() {
     // Controls
     document.getElementById('expandAllBtn').addEventListener('click', expandAll);
     document.getElementById('collapseAllBtn').addEventListener('click', collapseAll);
+    document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
+    document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
     document.getElementById('resetZoomBtn').addEventListener('click', resetView);
     document.getElementById('exportBtn').addEventListener('click', exportData);
     document.getElementById('importBtn').addEventListener('click', () => {
@@ -295,40 +303,110 @@ function addRelationship(parentId, childId, type) {
             childId: childId
         });
     } else if (type === 'parent') {
+        // When adding a parent: childId is the new parent, parentId is the existing person
         familyData.relationships.children.push({
             parentId: childId,
             childId: parentId
         });
+        // The new parent becomes the root (renderTree will find true topmost ancestor)
+        familyData.rootPersonId = childId;
     }
 }
 
 function deletePerson(personId) {
-    if (confirm('Are you sure you want to delete this person and all their descendants?')) {
-        // Remove person
-        delete familyData.members[personId];
-        
-        // Remove relationships
-        familyData.relationships.spouses = familyData.relationships.spouses.filter(
-            rel => rel.person1 !== personId && rel.person2 !== personId
-        );
-        familyData.relationships.children = familyData.relationships.children.filter(
-            rel => rel.parentId !== personId && rel.childId !== personId
-        );
-        
-        // If root person deleted, find new root or reset
-        if (familyData.rootPersonId === personId) {
+    const person = familyData.members[personId];
+    const children = getChildren(personId);
+    
+    let message = `Delete "${person.name}"?\n\n`;
+    if (children.length > 0) {
+        message += `This person has ${children.length} child${children.length > 1 ? 'ren' : ''}.\n\n`;
+        message += 'Choose OK to delete ONLY this person (children will remain)\n';
+        message += 'or Cancel to abort.';
+    } else {
+        message += 'This action cannot be undone.';
+    }
+    
+    if (confirm(message)) {
+        deletePersonOnly(personId);
+    }
+}
+
+function deletePersonOnly(personId) {
+    const children = getChildren(personId);
+    const spouse = getSpouse(personId);
+    
+    // Remove person
+    delete familyData.members[personId];
+    
+    // Remove spouse relationships
+    familyData.relationships.spouses = familyData.relationships.spouses.filter(
+        rel => rel.person1 !== personId && rel.person2 !== personId
+    );
+    
+    // Remove parent-child relationships where this person is involved
+    familyData.relationships.children = familyData.relationships.children.filter(
+        rel => rel.parentId !== personId && rel.childId !== personId
+    );
+    
+    // Handle root person update
+    if (familyData.rootPersonId === personId) {
+        // Priority: spouse, first child, or any remaining person
+        if (spouse) {
+            familyData.rootPersonId = spouse.id;
+        } else if (children.length > 0) {
+            familyData.rootPersonId = children[0].id;
+        } else {
             const remainingIds = Object.keys(familyData.members);
             familyData.rootPersonId = remainingIds.length > 0 ? remainingIds[0] : null;
         }
-        
-        saveData();
-        renderTree();
     }
+    
+    saveData();
+    renderTree();
+}
+
+function deletePersonAndDescendants(personId) {
+    const children = getChildren(personId);
+    
+    // Recursively delete all children first
+    children.forEach(child => {
+        deletePersonAndDescendants(child.id);
+    });
+    
+    // Then delete this person
+    deletePersonOnly(personId);
 }
 
 // ====================================================================
 // TREE RENDERING
 // ====================================================================
+function findTopmostAncestor(personId) {
+    // Find the topmost ancestor (person with no parents)
+    let current = personId;
+    let visited = new Set();
+    
+    while (current && !visited.has(current)) {
+        visited.add(current);
+        let parent = null;
+        
+        // Look for a parent relationship where current is the child
+        for (const rel of familyData.relationships.children) {
+            if (rel.childId === current) {
+                parent = rel.parentId;
+                break;
+            }
+        }
+        
+        if (parent && familyData.members[parent]) {
+            current = parent;
+        } else {
+            break;
+        }
+    }
+    
+    return current;
+}
+
 function renderTree() {
     const canvas = document.getElementById('treeCanvas');
     canvas.innerHTML = '';
@@ -338,7 +416,13 @@ function renderTree() {
         return;
     }
     
-    const rootPerson = familyData.members[familyData.rootPersonId];
+    // Always find and render from the topmost ancestor
+    const actualRoot = findTopmostAncestor(familyData.rootPersonId);
+    if (actualRoot !== familyData.rootPersonId) {
+        familyData.rootPersonId = actualRoot;
+    }
+    
+    const rootPerson = familyData.members[actualRoot];
     const treeNode = buildTreeNode(rootPerson.id, null);
     canvas.appendChild(treeNode);
 }
@@ -367,9 +451,11 @@ function buildTreeNode(personId, spouseId) {
     
     container.appendChild(familyGroup);
     
+    // Get children for this person
+    const children = getChildren(personId);
+    
     // Add children if not collapsed
     if (!person.collapsed) {
-        const children = getChildren(personId);
         if (children.length > 0) {
             const childrenContainer = document.createElement('div');
             childrenContainer.className = 'children-container';
@@ -384,7 +470,6 @@ function buildTreeNode(personId, spouseId) {
             container.appendChild(childrenContainer);
         }
     } else {
-        const children = getChildren(personId);
         if (children.length > 0) {
             const indicator = document.createElement('div');
             indicator.className = 'collapsed-indicator';
@@ -451,6 +536,18 @@ function createPersonCard(person) {
     
     deleteBtn.style.background = '#dc3545';
     
+    // Add "Delete All" button if person has descendants
+    if (children.length > 0) {
+        const deleteAllBtn = createButton('Delete + Descendants', () => {
+            if (confirm(`Delete "${person.name}" and ALL their descendants?\n\nThis will delete ${countAllDescendants(person.id) + 1} people total.\n\nThis action cannot be undone.`)) {
+                deletePersonAndDescendants(person.id);
+            }
+        });
+        deleteAllBtn.style.background = '#8b0000';
+        deleteAllBtn.style.fontSize = '0.75rem';
+        actions.appendChild(deleteAllBtn);
+    }
+    
     actions.appendChild(addParentBtn);
     
     // Only show spouse button if no spouse exists
@@ -481,6 +578,17 @@ function createButton(text, onClick) {
 // ====================================================================
 // HELPER FUNCTIONS
 // ====================================================================
+function countAllDescendants(personId) {
+    const children = getChildren(personId);
+    let count = children.length;
+    
+    children.forEach(child => {
+        count += countAllDescendants(child.id);
+    });
+    
+    return count;
+}
+
 function getSpouse(personId) {
     for (const rel of familyData.relationships.spouses) {
         if (rel.person1 === personId) {
@@ -531,9 +639,31 @@ function collapseAll() {
     renderTree();
 }
 
+function zoomIn() {
+    zoomLevel = Math.min(zoomLevel + 0.1, 2.0);
+    applyZoom();
+}
+
+function zoomOut() {
+    zoomLevel = Math.max(zoomLevel - 0.1, 0.5);
+    applyZoom();
+}
+
+function applyZoom() {
+    const canvas = document.getElementById('treeCanvas');
+    canvas.style.transform = `scale(${zoomLevel})`;
+    canvas.style.transformOrigin = 'center top';
+    console.log(`Zoom level: ${(zoomLevel * 100).toFixed(0)}%`);
+}
+
 function resetView() {
     const container = document.getElementById('treeContainer');
     const canvas = document.getElementById('treeCanvas');
+    
+    // Reset zoom to 100%
+    zoomLevel = 1.0;
+    canvas.style.transform = 'scale(1)';
+    canvas.style.transformOrigin = 'center top';
     
     // Expand all nodes first to get accurate dimensions
     Object.keys(familyData.members).forEach(id => {
@@ -543,26 +673,23 @@ function resetView() {
     // Re-render the tree
     renderTree();
     
-    // Wait for render to complete, then center
+    // Center the content after rendering
     setTimeout(() => {
+        // Get actual dimensions
+        const canvasWidth = canvas.offsetWidth;
+        const canvasHeight = canvas.offsetHeight;
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
-        const canvasWidth = canvas.scrollWidth;
-        const canvasHeight = canvas.scrollHeight;
         
-        // Center horizontally
-        if (canvasWidth > containerWidth) {
-            container.scrollLeft = (canvasWidth - containerWidth) / 2;
-        } else {
-            container.scrollLeft = 0;
-        }
+        // Calculate scroll positions to center
+        const scrollLeft = Math.max(0, (canvasWidth - containerWidth) / 2);
+        const scrollTop = Math.max(0, (canvasHeight - containerHeight) / 2);
         
-        // Center vertically
-        if (canvasHeight > containerHeight) {
-            container.scrollTop = (canvasHeight - containerHeight) / 2;
-        } else {
-            container.scrollTop = 0;
-        }
+        container.scrollLeft = scrollLeft;
+        container.scrollTop = scrollTop;
+        
+        console.log(`Reset view - Canvas: ${canvasWidth}x${canvasHeight}, Container: ${containerWidth}x${containerHeight}`);
+        console.log(`Scroll to: ${scrollLeft}, ${scrollTop}`);
     }, 100);
 }
 
