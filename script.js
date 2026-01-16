@@ -60,6 +60,7 @@ let modalAction = null;
 let parentIdForNew = null;
 let relationshipType = null;
 let familyTreeId = 'default'; // Can be changed to support multiple families
+let zoomLevel = 1.0; // Current zoom level
 
 // ====================================================================
 // APP INITIALIZATION
@@ -85,6 +86,8 @@ function setupEventListeners() {
     // Controls
     document.getElementById('expandAllBtn').addEventListener('click', expandAll);
     document.getElementById('collapseAllBtn').addEventListener('click', collapseAll);
+    document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
+    document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
     document.getElementById('resetZoomBtn').addEventListener('click', resetView);
     document.getElementById('exportBtn').addEventListener('click', exportData);
     document.getElementById('importBtn').addEventListener('click', () => {
@@ -636,9 +639,30 @@ function collapseAll() {
     renderTree();
 }
 
+function zoomIn() {
+    zoomLevel = Math.min(zoomLevel + 0.1, 2.0);
+    applyZoom();
+}
+
+function zoomOut() {
+    zoomLevel = Math.max(zoomLevel - 0.1, 0.5);
+    applyZoom();
+}
+
+function applyZoom() {
+    const canvas = document.getElementById('treeCanvas');
+    canvas.style.transform = `scale(${zoomLevel})`;
+    canvas.style.transformOrigin = 'center top';
+    console.log(`Zoom level: ${(zoomLevel * 100).toFixed(0)}%`);
+}
+
 function resetView() {
     const container = document.getElementById('treeContainer');
     const canvas = document.getElementById('treeCanvas');
+    
+    // Reset zoom to 100%
+    zoomLevel = 1.0;
+    applyZoom();
     
     // Expand all nodes first to get accurate dimensions
     Object.keys(familyData.members).forEach(id => {
@@ -651,20 +675,21 @@ function resetView() {
     // Use requestAnimationFrame to ensure DOM is fully rendered
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-            // Get dimensions after layout is complete
-            const containerRect = container.getBoundingClientRect();
-            const canvasRect = canvas.getBoundingClientRect();
+            // Reset scroll to top-left then center
+            container.scrollLeft = 0;
+            container.scrollTop = 0;
             
-            // Calculate center positions
-            const scrollLeft = Math.max(0, (canvas.scrollWidth - containerRect.width) / 2);
-            const scrollTop = Math.max(0, (canvas.scrollHeight - containerRect.height) / 2);
-            
-            container.scrollLeft = scrollLeft;
-            container.scrollTop = scrollTop;
-            
-            console.log(`Container: ${containerRect.width}x${containerRect.height}`);
-            console.log(`Canvas: ${canvas.scrollWidth}x${canvas.scrollHeight}`);
-            console.log(`Scrolling to: left=${scrollLeft}, top=${scrollTop}`);
+            // Small delay to ensure layout is complete
+            setTimeout(() => {
+                const containerRect = container.getBoundingClientRect();
+                const scrollLeft = Math.max(0, (canvas.scrollWidth - containerRect.width) / 2);
+                const scrollTop = Math.max(0, (canvas.scrollHeight - containerRect.height) / 2);
+                
+                container.scrollLeft = scrollLeft;
+                container.scrollTop = scrollTop;
+                
+                console.log(`Reset view - Zoom: 100%, Centered`);
+            }, 50);
         });
     });
 }
