@@ -299,6 +299,11 @@ function addRelationship(parentId, childId, type) {
             parentId: childId,
             childId: parentId
         });
+        
+        // If adding a parent to the current root, update the root to the new parent
+        if (familyData.rootPersonId === parentId) {
+            familyData.rootPersonId = childId;
+        }
     }
 }
 
