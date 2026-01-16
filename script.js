@@ -295,15 +295,13 @@ function addRelationship(parentId, childId, type) {
             childId: childId
         });
     } else if (type === 'parent') {
+        // When adding a parent: childId is the new parent, parentId is the existing person
         familyData.relationships.children.push({
             parentId: childId,
             childId: parentId
         });
-        
-        // If adding a parent to the current root, update the root to the new parent
-        if (familyData.rootPersonId === parentId) {
-            familyData.rootPersonId = childId;
-        }
+        // The new parent becomes the root (renderTree will find true topmost ancestor)
+        familyData.rootPersonId = childId;
     }
 }
 
@@ -334,6 +332,33 @@ function deletePerson(personId) {
 // ====================================================================
 // TREE RENDERING
 // ====================================================================
+function findTopmostAncestor(personId) {
+    // Find the topmost ancestor (person with no parents)
+    let current = personId;
+    let visited = new Set();
+    
+    while (current && !visited.has(current)) {
+        visited.add(current);
+        let parent = null;
+        
+        // Look for a parent relationship where current is the child
+        for (const rel of familyData.relationships.children) {
+            if (rel.childId === current) {
+                parent = rel.parentId;
+                break;
+            }
+        }
+        
+        if (parent && familyData.members[parent]) {
+            current = parent;
+        } else {
+            break;
+        }
+    }
+    
+    return current;
+}
+
 function renderTree() {
     const canvas = document.getElementById('treeCanvas');
     canvas.innerHTML = '';
@@ -343,7 +368,13 @@ function renderTree() {
         return;
     }
     
-    const rootPerson = familyData.members[familyData.rootPersonId];
+    // Always find and render from the topmost ancestor
+    const actualRoot = findTopmostAncestor(familyData.rootPersonId);
+    if (actualRoot !== familyData.rootPersonId) {
+        familyData.rootPersonId = actualRoot;
+    }
+    
+    const rootPerson = familyData.members[actualRoot];
     const treeNode = buildTreeNode(rootPerson.id, null);
     canvas.appendChild(treeNode);
 }
