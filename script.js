@@ -306,27 +306,67 @@ function addRelationship(parentId, childId, type) {
 }
 
 function deletePerson(personId) {
-    if (confirm('Are you sure you want to delete this person and all their descendants?')) {
-        // Remove person
-        delete familyData.members[personId];
-        
-        // Remove relationships
-        familyData.relationships.spouses = familyData.relationships.spouses.filter(
-            rel => rel.person1 !== personId && rel.person2 !== personId
-        );
-        familyData.relationships.children = familyData.relationships.children.filter(
-            rel => rel.parentId !== personId && rel.childId !== personId
-        );
-        
-        // If root person deleted, find new root or reset
-        if (familyData.rootPersonId === personId) {
+    const person = familyData.members[personId];
+    const children = getChildren(personId);
+    
+    let message = `Delete "${person.name}"?\n\n`;
+    if (children.length > 0) {
+        message += `This person has ${children.length} child${children.length > 1 ? 'ren' : ''}.\n\n`;
+        message += 'Choose OK to delete ONLY this person (children will remain)\n';
+        message += 'or Cancel to abort.';
+    } else {
+        message += 'This action cannot be undone.';
+    }
+    
+    if (confirm(message)) {
+        deletePersonOnly(personId);
+    }
+}
+
+function deletePersonOnly(personId) {
+    const children = getChildren(personId);
+    const spouse = getSpouse(personId);
+    
+    // Remove person
+    delete familyData.members[personId];
+    
+    // Remove spouse relationships
+    familyData.relationships.spouses = familyData.relationships.spouses.filter(
+        rel => rel.person1 !== personId && rel.person2 !== personId
+    );
+    
+    // Remove parent-child relationships where this person is involved
+    familyData.relationships.children = familyData.relationships.children.filter(
+        rel => rel.parentId !== personId && rel.childId !== personId
+    );
+    
+    // Handle root person update
+    if (familyData.rootPersonId === personId) {
+        // Priority: spouse, first child, or any remaining person
+        if (spouse) {
+            familyData.rootPersonId = spouse.id;
+        } else if (children.length > 0) {
+            familyData.rootPersonId = children[0].id;
+        } else {
             const remainingIds = Object.keys(familyData.members);
             familyData.rootPersonId = remainingIds.length > 0 ? remainingIds[0] : null;
         }
-        
-        saveData();
-        renderTree();
     }
+    
+    saveData();
+    renderTree();
+}
+
+function deletePersonAndDescendants(personId) {
+    const children = getChildren(personId);
+    
+    // Recursively delete all children first
+    children.forEach(child => {
+        deletePersonAndDescendants(child.id);
+    });
+    
+    // Then delete this person
+    deletePersonOnly(personId);
 }
 
 // ====================================================================
@@ -487,6 +527,19 @@ function createPersonCard(person) {
     
     deleteBtn.style.background = '#dc3545';
     
+    // Add "Delete All" button if person has descendants
+    const children = getChildren(person.id);
+    if (children.length > 0) {
+        const deleteAllBtn = createButton('Delete + Descendants', () => {
+            if (confirm(`Delete "${person.name}" and ALL their descendants?\n\nThis will delete ${countAllDescendants(person.id) + 1} people total.\n\nThis action cannot be undone.`)) {
+                deletePersonAndDescendants(person.id);
+            }
+        });
+        deleteAllBtn.style.background = '#8b0000';
+        deleteAllBtn.style.fontSize = '0.75rem';
+        actions.appendChild(deleteAllBtn);
+    }
+    
     actions.appendChild(addParentBtn);
     
     // Only show spouse button if no spouse exists
@@ -517,6 +570,17 @@ function createButton(text, onClick) {
 // ====================================================================
 // HELPER FUNCTIONS
 // ====================================================================
+function countAllDescendants(personId) {
+    const children = getChildren(personId);
+    let count = children.length;
+    
+    children.forEach(child => {
+        count += countAllDescendants(child.id);
+    });
+    
+    return count;
+}
+
 function getSpouse(personId) {
     for (const rel of familyData.relationships.spouses) {
         if (rel.person1 === personId) {
@@ -579,27 +643,29 @@ function resetView() {
     // Re-render the tree
     renderTree();
     
-    // Wait for render to complete, then center
-    setTimeout(() => {
-        const containerWidth = container.clientWidth;
-        const containerHeight = container.clientHeight;
-        const canvasWidth = canvas.scrollWidth;
-        const canvasHeight = canvas.scrollHeight;
+    // Use requestAnimationFrame to ensure DOM is fully rendered
+    requestAnimationFrame(() => {
+        // Force a reflow to ensure measurements are accurate
+        canvas.offsetHeight;
         
-        // Center horizontally
-        if (canvasWidth > containerWidth) {
-            container.scrollLeft = (canvasWidth - containerWidth) / 2;
-        } else {
-            container.scrollLeft = 0;
-        }
-        
-        // Center vertically
-        if (canvasHeight > containerHeight) {
-            container.scrollTop = (canvasHeight - containerHeight) / 2;
-        } else {
-            container.scrollTop = 0;
-        }
-    }, 100);
+        requestAnimationFrame(() => {
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            const canvasWidth = canvas.scrollWidth;
+            const canvasHeight = canvas.scrollHeight;
+            
+            // Center horizontally
+            const scrollLeft = Math.max(0, (canvasWidth - containerWidth) / 2);
+            container.scrollLeft = scrollLeft;
+            
+            // Center vertically  
+            const scrollTop = Math.max(0, (canvasHeight - containerHeight) / 2);
+            container.scrollTop = scrollTop;
+            
+            console.log(`Centering: canvas(${canvasWidth}x${canvasHeight}) in container(${containerWidth}x${containerHeight})`);
+            console.log(`Scroll to: left=${scrollLeft}, top=${scrollTop}`);
+        });
+    });
 }
 
 // ====================================================================
