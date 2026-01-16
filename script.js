@@ -17,17 +17,22 @@ const firebaseConfig = {
 let db = null;
 let isFirebaseConfigured = false;
 
-try {
-    if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        isFirebaseConfigured = true;
-        console.log('✅ Firebase connected - Cloud storage enabled');
-    } else {
-        console.warn('⚠️ Firebase not configured - Using local storage only');
+// Wait for Firebase to load before initializing
+if (typeof firebase !== 'undefined') {
+    try {
+        if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            isFirebaseConfigured = true;
+            console.log('✅ Firebase connected - Cloud storage enabled');
+        } else {
+            console.warn('⚠️ Firebase not configured - Using local storage only');
+        }
+    } catch (error) {
+        console.warn('⚠️ Firebase initialization failed - Using local storage only:', error);
     }
-} catch (error) {
-    console.warn('⚠️ Firebase initialization failed - Using local storage only:', error);
+} else {
+    console.warn('⚠️ Firebase SDK not loaded - Using local storage only');
 }
 
 // ====================================================================
