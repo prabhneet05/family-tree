@@ -448,9 +448,11 @@ function buildTreeNode(personId, spouseId) {
     
     container.appendChild(familyGroup);
     
+    // Get children for this person
+    const children = getChildren(personId);
+    
     // Add children if not collapsed
     if (!person.collapsed) {
-        const children = getChildren(personId);
         if (children.length > 0) {
             const childrenContainer = document.createElement('div');
             childrenContainer.className = 'children-container';
@@ -465,7 +467,6 @@ function buildTreeNode(personId, spouseId) {
             container.appendChild(childrenContainer);
         }
     } else {
-        const children = getChildren(personId);
         if (children.length > 0) {
             const indicator = document.createElement('div');
             indicator.className = 'collapsed-indicator';
