@@ -662,7 +662,8 @@ function resetView() {
     
     // Reset zoom to 100%
     zoomLevel = 1.0;
-    applyZoom();
+    canvas.style.transform = 'scale(1)';
+    canvas.style.transformOrigin = 'center top';
     
     // Expand all nodes first to get accurate dimensions
     Object.keys(familyData.members).forEach(id => {
@@ -672,26 +673,24 @@ function resetView() {
     // Re-render the tree
     renderTree();
     
-    // Use requestAnimationFrame to ensure DOM is fully rendered
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            // Reset scroll to top-left then center
-            container.scrollLeft = 0;
-            container.scrollTop = 0;
-            
-            // Small delay to ensure layout is complete
-            setTimeout(() => {
-                const containerRect = container.getBoundingClientRect();
-                const scrollLeft = Math.max(0, (canvas.scrollWidth - containerRect.width) / 2);
-                const scrollTop = Math.max(0, (canvas.scrollHeight - containerRect.height) / 2);
-                
-                container.scrollLeft = scrollLeft;
-                container.scrollTop = scrollTop;
-                
-                console.log(`Reset view - Zoom: 100%, Centered`);
-            }, 50);
-        });
-    });
+    // Center the content after rendering
+    setTimeout(() => {
+        // Get actual dimensions
+        const canvasWidth = canvas.offsetWidth;
+        const canvasHeight = canvas.offsetHeight;
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        
+        // Calculate scroll positions to center
+        const scrollLeft = Math.max(0, (canvasWidth - containerWidth) / 2);
+        const scrollTop = Math.max(0, (canvasHeight - containerHeight) / 2);
+        
+        container.scrollLeft = scrollLeft;
+        container.scrollTop = scrollTop;
+        
+        console.log(`Reset view - Canvas: ${canvasWidth}x${canvasHeight}, Container: ${containerWidth}x${containerHeight}`);
+        console.log(`Scroll to: ${scrollLeft}, ${scrollTop}`);
+    }, 100);
 }
 
 // ====================================================================
