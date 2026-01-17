@@ -85,6 +85,48 @@ let currentTreeAuth = null; // Current tree's auth info
 let zoomLevel = 1.0; // Current zoom level
 
 // ====================================================================
+// SCREEN MANAGEMENT
+// ====================================================================
+function showTreeSelector() {
+    console.log('Showing tree selector');
+    document.getElementById('treeSelectorScreen').style.display = 'flex';
+    document.getElementById('createTreeScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    populateTreeList();
+}
+
+function showCreateTreeScreen() {
+    console.log('Showing create tree screen');
+    document.getElementById('treeSelectorScreen').style.display = 'none';
+    document.getElementById('createTreeScreen').style.display = 'flex';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+}
+
+function showLoginScreen() {
+    console.log('Showing login screen for tree:', familyTreeId);
+    document.getElementById('treeSelectorScreen').style.display = 'none';
+    document.getElementById('createTreeScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+    
+    // Update login header with tree name
+    if (currentTreeAuth) {
+        document.getElementById('loginTreeName').textContent = currentTreeAuth.name + ' - Login';
+    }
+}
+
+function showMainApp() {
+    console.log('Showing main app');
+    document.getElementById('treeSelectorScreen').style.display = 'none';
+    document.getElementById('createTreeScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+    renderTree();
+}
+
+// ====================================================================
 // APP INITIALIZATION
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -175,48 +217,6 @@ function setupEventListeners() {
             closeModal();
         }
     });
-}
-
-// ====================================================================
-// SCREEN MANAGEMENT
-// ====================================================================
-function showTreeSelector() {
-    console.log('Showing tree selector');
-    document.getElementById('treeSelectorScreen').style.display = 'flex';
-    document.getElementById('createTreeScreen').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'none';
-    populateTreeList();
-}
-
-function showCreateTreeScreen() {
-    console.log('Showing create tree screen');
-    document.getElementById('treeSelectorScreen').style.display = 'none';
-    document.getElementById('createTreeScreen').style.display = 'flex';
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'none';
-}
-
-function showLoginScreen() {
-    console.log('Showing login screen for tree:', familyTreeId);
-    document.getElementById('treeSelectorScreen').style.display = 'none';
-    document.getElementById('createTreeScreen').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'flex';
-    document.getElementById('mainApp').style.display = 'none';
-    
-    // Update login header with tree name
-    if (currentTreeAuth) {
-        document.getElementById('loginTreeName').textContent = currentTreeAuth.name + ' - Login';
-    }
-}
-
-function showMainApp() {
-    console.log('Showing main app');
-    document.getElementById('treeSelectorScreen').style.display = 'none';
-    document.getElementById('createTreeScreen').style.display = 'none';
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'flex';
-    renderTree();
 }
 
 // ====================================================================
