@@ -88,23 +88,35 @@ let zoomLevel = 1.0; // Current zoom level
 // APP INITIALIZATION
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
+    // Setup event listeners first
+    setupEventListeners();
+    
     // Check URL for tree ID
     const urlParams = new URLSearchParams(window.location.search);
     const treeIdFromUrl = urlParams.get('tree');
+    
+    console.log('Tree ID from URL:', treeIdFromUrl);
     
     if (treeIdFromUrl) {
         // Tree specified in URL - go to login
         familyTreeId = treeIdFromUrl;
         currentTreeAuth = getTreeAuth(familyTreeId);
         
+        console.log('Tree auth found:', currentTreeAuth);
+        
         if (!currentTreeAuth) {
+            console.error('Tree not found in storage');
             alert('Tree not found! Redirecting to tree selector...');
             window.location.href = window.location.pathname;
             return;
         }
         
         // Check if already logged in for this tree
-        if (sessionStorage.getItem(`authenticated_${familyTreeId}`) === 'true') {
+        const authKey = `authenticated_${familyTreeId}`;
+        const isAuthenticated = sessionStorage.getItem(authKey) === 'true';
+        console.log('Is authenticated:', isAuthenticated);
+        
+        if (isAuthenticated) {
             await loadData();
             showMainApp();
         } else {
@@ -112,10 +124,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } else {
         // No tree specified - show tree selector
+        console.log('No tree in URL, showing selector');
         showTreeSelector();
     }
-    
-    setupEventListeners();
 });
 
 // Event Listeners Setup
@@ -167,6 +178,147 @@ function setupEventListeners() {
 }
 
 // ====================================================================
+// SCREEN MANAGEMENT
+// ====================================================================
+function showTreeSelector() {
+    console.log('Showing tree selector');
+    document.getElementById('treeSelectorScreen').style.display = 'flex';
+    document.getElementById('createTreeScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    populateTreeList();
+}
+
+function showCreateTreeScreen() {
+    console.log('Showing create tree screen');
+    document.getElementById('treeSelectorScreen').style.display = 'none';
+    document.getElementById('createTreeScreen').style.display = 'flex';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+}
+
+function showLoginScreen() {
+    console.log('Showing login screen for tree:', familyTreeId);
+    document.getElementById('treeSelectorScreen').style.display = 'none';
+    document.getElementById('createTreeScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+    
+    // Update login header with tree name
+    if (currentTreeAuth) {
+        document.getElementById('loginTreeName').textContent = currentTreeAuth.name + ' - Login';
+    }
+}
+
+function showMainApp() {
+    console.log('Showing main app');
+    document.getElementById('treeSelectorScreen').style.display = 'none';
+    document.getElementById('createTreeScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+    renderTree();
+}
+
+// ====================================================================
+// TREE MANAGEMENT
+// ====================================================================
+function populateTreeList() {
+    const treeList = document.getElementById('treeList');
+    const trees = getAllTrees();
+    
+    if (Object.keys(trees).length === 0) {
+        treeList.innerHTML = '<p class="no-trees">No family trees yet. Create your first one!</p>';
+        return;
+    }
+    
+    treeList.innerHTML = '';
+    for (const [treeId, treeData] of Object.entries(trees)) {
+        const treeCard = document.createElement('div');
+        treeCard.className = 'tree-card';
+        treeCard.innerHTML = `
+            <div class="tree-card-content">
+                <h3>🌳 ${treeData.name}</h3>
+                <p class="tree-id">ID: ${treeId}</p>
+                <p class="tree-url">URL: ${window.location.origin}${window.location.pathname}?tree=${treeId}</p>
+            </div>
+            <div class="tree-card-actions">
+                <button class="tree-btn open-btn" data-tree-id="${treeId}">Open</button>
+                <button class="tree-btn delete-btn" data-tree-id="${treeId}" data-tree-name="${treeData.name}">Delete</button>
+            </div>
+        `;
+        
+        // Add event listeners
+        const openBtn = treeCard.querySelector('.open-btn');
+        const deleteBtn = treeCard.querySelector('.delete-btn');
+        
+        openBtn.addEventListener('click', () => openTree(treeId));
+        deleteBtn.addEventListener('click', () => confirmDeleteTree(treeId, treeData.name));
+        
+        treeList.appendChild(treeCard);
+    }
+}
+
+function openTree(treeId) {
+    window.location.href = `${window.location.pathname}?tree=${treeId}`;
+}
+
+function confirmDeleteTree(treeId, treeName) {
+    if (confirm(`Are you sure you want to delete "${treeName}"?\n\nThis will permanently delete all family data for this tree. This action cannot be undone.`)) {
+        deleteTree(treeId);
+        populateTreeList();
+    }
+}
+
+function handleCreateTree(e) {
+    e.preventDefault();
+    const treeId = document.getElementById('treeId').value.toLowerCase().trim();
+    const treeName = document.getElementById('treeName').value.trim();
+    const username = document.getElementById('newUsername').value;
+    const password = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const errorDiv = document.getElementById('createError');
+    
+    // Validate
+    if (!treeId.match(/^[a-z0-9-]+$/)) {
+        errorDiv.textContent = 'Tree ID must contain only lowercase letters, numbers, and hyphens';
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        errorDiv.textContent = 'Passwords do not match';
+        return;
+    }
+    
+    if (password.length < 6) {
+        errorDiv.textContent = 'Password must be at least 6 characters';
+        return;
+    }
+    
+    // Check if tree already exists
+    const existingTree = getTreeAuth(treeId);
+    if (existingTree) {
+        errorDiv.textContent = 'A tree with this ID already exists. Please choose a different ID.';
+        return;
+    }
+    
+    // Create tree
+    saveTreeAuth(treeId, {
+        name: treeName,
+        username: username,
+        password: password,
+        createdAt: new Date().toISOString()
+    });
+    
+    // Clear form
+    document.getElementById('createTreeForm').reset();
+    errorDiv.textContent = '';
+    
+    // Show success and redirect
+    alert(`Tree "${treeName}" created successfully!\n\nYou can access it at:\n${window.location.origin}${window.location.pathname}?tree=${treeId}`);
+    showTreeSelector();
+}
+
+// ====================================================================
 // AUTHENTICATION
 // ====================================================================
 function handleLogin(e) {
@@ -175,8 +327,13 @@ function handleLogin(e) {
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
     
-    if (username === AUTH.username && password === AUTH.password) {
-        sessionStorage.setItem('authenticated', 'true');
+    if (!currentTreeAuth) {
+        errorDiv.textContent = 'Tree configuration error';
+        return;
+    }
+    
+    if (username === currentTreeAuth.username && password === currentTreeAuth.password) {
+        sessionStorage.setItem(`authenticated_${familyTreeId}`, 'true');
         loadData().then(() => {
             showMainApp();
             errorDiv.textContent = '';
@@ -187,8 +344,9 @@ function handleLogin(e) {
 }
 
 function handleLogout() {
-    sessionStorage.removeItem('authenticated');
-    document.getElementById('loginScreen').style.display = 'flex';
+    sessionStorage.removeItem(`authenticated_${familyTreeId}`);
+    window.location.href = window.location.pathname;
+
     document.getElementById('mainApp').style.display = 'none';
     document.getElementById('username').value = '';
     document.getElementById('password').value = '';
@@ -879,8 +1037,9 @@ async function loadData() {
 // Save to localStorage (backup or primary if Firebase not configured)
 function saveToLocalStorage() {
     try {
-        localStorage.setItem('familyTreeData', JSON.stringify(familyData));
-        console.log('💾 Data saved locally');
+        const storageKey = `familyTree_${familyTreeId}`;
+        localStorage.setItem(storageKey, JSON.stringify(familyData));
+        console.log(`💾 Data saved locally for tree: ${familyTreeId}`);
     } catch (error) {
         console.error('Error saving to localStorage:', error);
         alert('Unable to save data locally. Your browser storage might be full.');
@@ -889,11 +1048,12 @@ function saveToLocalStorage() {
 
 // Load from localStorage
 function loadFromLocalStorage() {
-    const saved = localStorage.getItem('familyTreeData');
+    const storageKey = `familyTree_${familyTreeId}`;
+    const saved = localStorage.getItem(storageKey);
     if (saved) {
         try {
             familyData = JSON.parse(saved);
-            console.log('💾 Data loaded from local storage');
+            console.log(`💾 Data loaded from local storage for tree: ${familyTreeId}`);
         } catch (e) {
             console.error('Error loading data:', e);
         }

@@ -33,8 +33,22 @@ body {
     margin-bottom: 30px;
 }
 
+.subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 25px;
+    font-size: 14px;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 5px;
+    color: #888;
+    font-size: 12px;
+}
+
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .form-group label {
@@ -74,11 +88,143 @@ button:hover {
     background: #5568d3;
 }
 
+.secondary-btn {
+    background: #6c757d;
+    margin-top: 10px;
+}
+
+.secondary-btn:hover {
+    background: #5a6268;
+}
+
 .error-message {
     color: #d32f2f;
     margin-top: 10px;
     text-align: center;
     font-size: 14px;
+}
+
+/* Tree Selector */
+.selector-box {
+    background: white;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    min-width: 500px;
+    max-width: 700px;
+    width: 90%;
+}
+
+.selector-box h2 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.tree-list {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.no-trees {
+    text-align: center;
+    color: #888;
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+.tree-card {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s;
+}
+
+.tree-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.tree-card-content h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.tree-card-content p {
+    margin: 5px 0;
+    font-size: 13px;
+    color: #666;
+}
+
+.tree-id {
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.tree-url {
+    color: #667eea;
+    font-size: 11px;
+    word-break: break-all;
+}
+
+.tree-card-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.tree-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+    width: auto;
+    font-weight: 500;
+}
+
+.open-btn {
+    background: #667eea !important;
+    color: white !important;
+}
+
+.open-btn:hover {
+    background: #5568d3 !important;
+}
+
+.delete-btn {
+    background: #dc3545 !important;
+    color: white !important;
+}
+
+.delete-btn:hover {
+    background: #c82333 !important;
+}
+
+.create-tree-btn {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.create-tree-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
 /* Main App */
@@ -696,15 +842,17 @@ header h1 {
 
 .modal-content {
     background-color: white;
-    margin: 5% auto;
-    padding: 30px;
+    margin: 2% auto;
+    padding: 20px;
     border-radius: 10px;
     width: 90%;
     max-width: 500px;
-    max-height: 80vh;
+    max-height: 95vh;
     overflow-y: auto;
     position: relative;
     animation: slideIn 0.3s;
+    display: flex;
+    flex-direction: column;
 }
 
 @keyframes slideIn {
@@ -733,14 +881,16 @@ header h1 {
 }
 
 .modal-content h2 {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    margin-top: 5px;
     color: #333;
+    font-size: 22px;
 }
 
 .form-buttons {
     display: flex;
     gap: 10px;
-    margin-top: 20px;
+    margin-top: 15px;
 }
 
 .form-buttons button {
