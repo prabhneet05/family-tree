@@ -188,7 +188,7 @@ header h1 {
 }
 
 .tree-wrapper {
-    min-width: 100%;
+    width: 100%;
     min-height: 100%;
     display: flex;
     justify-content: center;
@@ -197,7 +197,7 @@ header h1 {
 
 .tree-canvas {
     padding: 40px;
-    display: flex;
+    display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
@@ -328,6 +328,7 @@ header h1 {
     padding: 10px;
     border-radius: 10px;
     background: rgba(102, 126, 234, 0.05);
+    justify-content: center;
 }
 
 .spouse-container {

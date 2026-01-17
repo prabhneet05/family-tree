@@ -425,6 +425,9 @@ function renderTree() {
     const rootPerson = familyData.members[actualRoot];
     const treeNode = buildTreeNode(rootPerson.id, null);
     canvas.appendChild(treeNode);
+    
+    // Center the tree after rendering
+    setTimeout(() => centerTree(), 100);
 }
 
 function buildTreeNode(personId, spouseId) {
@@ -656,8 +659,25 @@ function applyZoom() {
     console.log(`Zoom level: ${(zoomLevel * 100).toFixed(0)}%`);
 }
 
-function resetView() {
+function centerTree() {
     const container = document.getElementById('treeContainer');
+    const canvas = document.getElementById('treeCanvas');
+    
+    // Get the dimensions
+    const scrollWidth = canvas.scrollWidth;
+    const scrollHeight = canvas.scrollHeight;
+    const clientWidth = container.clientWidth;
+    const clientHeight = container.clientHeight;
+    
+    // Center horizontally and position top portion visible
+    const scrollLeft = Math.max(0, (scrollWidth - clientWidth) / 2);
+    const scrollTop = 0; // Start at top to see root node
+    
+    container.scrollLeft = scrollLeft;
+    container.scrollTop = scrollTop;
+}
+
+function resetView() {
     const canvas = document.getElementById('treeCanvas');
     
     // Reset zoom to 100%
@@ -665,31 +685,13 @@ function resetView() {
     canvas.style.transform = 'scale(1)';
     canvas.style.transformOrigin = 'center top';
     
-    // Expand all nodes first to get accurate dimensions
-    Object.keys(familyData.members).forEach(id => {
-        familyData.members[id].collapsed = false;
-    });
-    
-    // Re-render the tree
+    // Re-render the tree to apply zoom reset
     renderTree();
     
-    // Center the content after rendering
+    // Center the tree
     setTimeout(() => {
-        // Get actual dimensions
-        const canvasWidth = canvas.offsetWidth;
-        const canvasHeight = canvas.offsetHeight;
-        const containerWidth = container.clientWidth;
-        const containerHeight = container.clientHeight;
-        
-        // Calculate scroll positions to center
-        const scrollLeft = Math.max(0, (canvasWidth - containerWidth) / 2);
-        const scrollTop = Math.max(0, (canvasHeight - containerHeight) / 2);
-        
-        container.scrollLeft = scrollLeft;
-        container.scrollTop = scrollTop;
-        
-        console.log(`Reset view - Canvas: ${canvasWidth}x${canvasHeight}, Container: ${containerWidth}x${containerHeight}`);
-        console.log(`Scroll to: ${scrollLeft}, ${scrollTop}`);
+        centerTree();
+        console.log('Reset view - Centered at zoom 100%');
     }, 100);
 }
 
