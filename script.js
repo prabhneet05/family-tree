@@ -38,10 +38,31 @@ if (typeof firebase !== 'undefined') {
 // ====================================================================
 // AUTHENTICATION CONFIGURATION
 // ====================================================================
-const AUTH = {
-    username: 'admin',
-    password: 'family2026'
-};
+// Multi-tree authentication - stored per tree
+const TREES_STORAGE_KEY = 'familyTreesAuth';
+
+function getTreeAuth(treeId) {
+    const trees = JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
+    return trees[treeId];
+}
+
+function saveTreeAuth(treeId, treeData) {
+    const trees = JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
+    trees[treeId] = treeData;
+    localStorage.setItem(TREES_STORAGE_KEY, JSON.stringify(trees));
+}
+
+function getAllTrees() {
+    return JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
+}
+
+function deleteTree(treeId) {
+    const trees = JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
+    delete trees[treeId];
+    localStorage.setItem(TREES_STORAGE_KEY, JSON.stringify(trees));
+    // Also delete tree data
+    localStorage.removeItem(`familyTree_${treeId}`);
+}
 
 // ====================================================================
 // GLOBAL STATE
@@ -59,41 +80,76 @@ let currentEditingId = null;
 let modalAction = null;
 let parentIdForNew = null;
 let relationshipType = null;
-let familyTreeId = 'default'; // Can be changed to support multiple families
+let familyTreeId = null; // Will be set from URL
+let currentTreeAuth = null; // Current tree's auth info
 let zoomLevel = 1.0; // Current zoom level
 
 // ====================================================================
 // APP INITIALIZATION
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    setupEventListeners();
+    // Check URL for tree ID
+    const urlParams = new URLSearchParams(window.location.search);
+    const treeIdFromUrl = urlParams.get('tree');
     
-    // Check if already logged in
-    if (sessionStorage.getItem('authenticated') === 'true') {
-        await loadData();
-        showMainApp();
+    if (treeIdFromUrl) {
+        // Tree specified in URL - go to login
+        familyTreeId = treeIdFromUrl;
+        currentTreeAuth = getTreeAuth(familyTreeId);
+        
+        if (!currentTreeAuth) {
+            alert('Tree not found! Redirecting to tree selector...');
+            window.location.href = window.location.pathname;
+            return;
+        }
+        
+        // Check if already logged in for this tree
+        if (sessionStorage.getItem(`authenticated_${familyTreeId}`) === 'true') {
+            await loadData();
+            showMainApp();
+        } else {
+            showLoginScreen();
+        }
+    } else {
+        // No tree specified - show tree selector
+        showTreeSelector();
     }
+    
+    setupEventListeners();
 });
 
 // Event Listeners Setup
 function setupEventListeners() {
+    // Tree Management
+    document.getElementById('createNewTreeBtn').addEventListener('click', showCreateTreeScreen);
+    document.getElementById('createTreeForm').addEventListener('submit', handleCreateTree);
+    document.getElementById('backToSelector').addEventListener('click', showTreeSelector);
+    document.getElementById('backToTrees').addEventListener('click', () => {
+        window.location.href = window.location.pathname;
+    });
+    
     // Login
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     
-    // Logout
+    // Burger Menu
+    document.getElementById('burgerBtn').addEventListener('click', toggleBurgerMenu);
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    
+    // Export Options
+    document.getElementById('exportJsonBtn').addEventListener('click', exportData);
+    document.getElementById('exportPdfBtn').addEventListener('click', exportAsPDF);
+    document.getElementById('exportJpegBtn').addEventListener('click', exportAsJPEG);
+    document.getElementById('importBtn').addEventListener('click', () => {
+        document.getElementById('importFile').click();
+        toggleBurgerMenu();
+    });
+    document.getElementById('importFile').addEventListener('change', importData);
     
     // Controls
     document.getElementById('expandAllBtn').addEventListener('click', expandAll);
     document.getElementById('collapseAllBtn').addEventListener('click', collapseAll);
     document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
     document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
-    document.getElementById('resetZoomBtn').addEventListener('click', resetView);
-    document.getElementById('exportBtn').addEventListener('click', exportData);
-    document.getElementById('importBtn').addEventListener('click', () => {
-        document.getElementById('importFile').click();
-    });
-    document.getElementById('importFile').addEventListener('change', importData);
     
     // Modal
     document.querySelector('.close').addEventListener('click', closeModal);
@@ -463,11 +519,20 @@ function buildTreeNode(personId, spouseId) {
             const childrenContainer = document.createElement('div');
             childrenContainer.className = 'children-container';
             
-            children.forEach(child => {
+            children.forEach((child, index) => {
+                const childWrapper = document.createElement('div');
+                childWrapper.className = 'child-wrapper';
+                
+                // Add vertical line from parent to child
+                const childConnector = document.createElement('div');
+                childConnector.className = 'child-connector-line';
+                childWrapper.appendChild(childConnector);
+                
                 const childNode = buildTreeNode(child.id, personId);
                 if (childNode) {
-                    childrenContainer.appendChild(childNode);
+                    childWrapper.appendChild(childNode);
                 }
+                childrenContainer.appendChild(childWrapper);
             });
             
             container.appendChild(childrenContainer);
@@ -518,51 +583,22 @@ function createPersonCard(person) {
     name.textContent = person.name;
     card.appendChild(name);
     
-    // Info
-    if (person.birthDate) {
-        const info = document.createElement('div');
-        info.className = 'node-info';
-        const year = new Date(person.birthDate).getFullYear();
-        info.textContent = `Born: ${year}`;
-        card.appendChild(info);
-    }
+    // Add right-click context menu
+    card.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showContextMenu(e, person);
+    });
     
-    // Actions
-    const actions = document.createElement('div');
-    actions.className = 'node-actions';
-    
-    const addParentBtn = createButton('+ Parent', () => openAddPersonModal(person.id, 'parent'));
-    const addSpouseBtn = createButton('+ Spouse', () => openAddPersonModal(person.id, 'spouse'));
-    const addChildBtn = createButton('+ Child', () => openAddPersonModal(person.id, 'child'));
-    const editBtn = createButton('Edit', () => openEditPersonModal(person.id));
-    const deleteBtn = createButton('Delete', () => deletePerson(person.id));
-    
-    deleteBtn.style.background = '#dc3545';
-    
-    // Add "Delete All" button if person has descendants
-    if (children.length > 0) {
-        const deleteAllBtn = createButton('Delete + Descendants', () => {
-            if (confirm(`Delete "${person.name}" and ALL their descendants?\n\nThis will delete ${countAllDescendants(person.id) + 1} people total.\n\nThis action cannot be undone.`)) {
-                deletePersonAndDescendants(person.id);
-            }
-        });
-        deleteAllBtn.style.background = '#8b0000';
-        deleteAllBtn.style.fontSize = '0.75rem';
-        actions.appendChild(deleteAllBtn);
-    }
-    
-    actions.appendChild(addParentBtn);
-    
-    // Only show spouse button if no spouse exists
-    if (!getSpouse(person.id)) {
-        actions.appendChild(addSpouseBtn);
-    }
-    
-    actions.appendChild(addChildBtn);
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
-    
-    card.appendChild(actions);
+    // Also show context menu on long press for touch devices
+    let pressTimer;
+    card.addEventListener('touchstart', (e) => {
+        pressTimer = setTimeout(() => {
+            showContextMenu(e.touches[0], person);
+        }, 500);
+    });
+    card.addEventListener('touchend', () => {
+        clearTimeout(pressTimer);
+    });
     
     return card;
 }
@@ -576,6 +612,103 @@ function createButton(text, onClick) {
         onClick();
     };
     return btn;
+}
+
+// ====================================================================
+// CONTEXT MENU
+// ====================================================================
+function showContextMenu(e, person) {
+    // Remove existing context menu if any
+    const existingMenu = document.querySelector('.context-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+    
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.className = 'context-menu active';
+    
+    const children = getChildren(person.id);
+    const spouse = getSpouse(person.id);
+    
+    // Menu items
+    const menuItems = [
+        { label: '➕ Add Parent', action: () => openAddPersonModal(person.id, 'parent') },
+        { label: '➕ Add Child', action: () => openAddPersonModal(person.id, 'child') },
+        { label: '💑 Add Spouse', action: () => openAddPersonModal(person.id, 'spouse') },
+        { divider: true },
+        { label: '✏️ Edit', action: () => openEditPersonModal(person.id) },
+        { divider: true },
+        { label: '🗑️ Delete', action: () => deletePerson(person.id), danger: true }
+    ];
+    
+    // Add delete all option if person has descendants
+    if (children.length > 0) {
+        menuItems.push({
+            label: '⚠️ Delete + Descendants',
+            action: () => {
+                if (confirm(`Delete "${person.name}" and ALL their descendants?\n\nThis will delete ${countAllDescendants(person.id) + 1} people total.\n\nThis action cannot be undone.`)) {
+                    deletePersonAndDescendants(person.id);
+                }
+            },
+            danger: true
+        });
+    }
+    
+    // Build menu
+    menuItems.forEach(item => {
+        if (item.divider) {
+            const divider = document.createElement('div');
+            divider.className = 'context-menu-divider';
+            menu.appendChild(divider);
+        } else {
+            const menuItem = document.createElement('button');
+            menuItem.className = 'context-menu-item';
+            if (item.danger) {
+                menuItem.classList.add('danger');
+            }
+            menuItem.textContent = item.label;
+            menuItem.onclick = () => {
+                item.action();
+                menu.remove();
+            };
+            menu.appendChild(menuItem);
+        }
+    });
+    
+    // Position menu
+    document.body.appendChild(menu);
+    const menuRect = menu.getBoundingClientRect();
+    const x = e.clientX || e.pageX;
+    const y = e.clientY || e.pageY;
+    
+    // Adjust position if menu goes off screen
+    let left = x;
+    let top = y;
+    
+    if (left + menuRect.width > window.innerWidth) {
+        left = window.innerWidth - menuRect.width - 10;
+    }
+    if (top + menuRect.height > window.innerHeight) {
+        top = window.innerHeight - menuRect.height - 10;
+    }
+    
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    
+    // Close menu on click outside
+    const closeMenu = (event) => {
+        if (!menu.contains(event.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+            document.removeEventListener('contextmenu', closeMenu);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+        document.addEventListener('contextmenu', closeMenu);
+    }, 10);
 }
 
 // ====================================================================
@@ -768,6 +901,37 @@ function loadFromLocalStorage() {
 }
 
 // ====================================================================
+// BURGER MENU
+// ====================================================================
+function toggleBurgerMenu() {
+    const menu = document.getElementById('burgerMenu');
+    const burger = document.getElementById('burgerBtn');
+    const isOpen = menu.classList.contains('active');
+    
+    if (isOpen) {
+        menu.classList.remove('active');
+        burger.classList.remove('active');
+        document.removeEventListener('click', closeBurgerMenuOutside);
+    } else {
+        menu.classList.add('active');
+        burger.classList.add('active');
+        setTimeout(() => {
+            document.addEventListener('click', closeBurgerMenuOutside);
+        }, 10);
+    }
+}
+
+function closeBurgerMenuOutside(e) {
+    const menu = document.getElementById('burgerMenu');
+    const burger = document.getElementById('burgerBtn');
+    if (!menu.contains(e.target) && !burger.contains(e.target)) {
+        menu.classList.remove('active');
+        burger.classList.remove('active');
+        document.removeEventListener('click', closeBurgerMenuOutside);
+    }
+}
+
+// ====================================================================
 // EXPORT / IMPORT
 // ====================================================================
 function exportData() {
@@ -779,6 +943,95 @@ function exportData() {
     link.download = `family-tree-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
+    toggleBurgerMenu();
+}
+
+async function exportAsPDF() {
+    const canvas = document.getElementById('treeCanvas');
+    const container = document.getElementById('treeContainer');
+    
+    // Temporarily reset zoom and styling for export
+    const originalTransform = canvas.style.transform;
+    canvas.style.transform = 'scale(1)';
+    
+    try {
+        // Use html2canvas to capture the tree
+        const canvasElement = await html2canvas(canvas, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            useCORS: true
+        });
+        
+        // Create PDF with jsPDF
+        const { jsPDF } = window.jspdf;
+        const imgData = canvasElement.toDataURL('image/png');
+        const imgWidth = canvasElement.width;
+        const imgHeight = canvasElement.height;
+        
+        // Calculate PDF dimensions (A4 landscape)
+        const pdfWidth = 297; // A4 width in mm (landscape)
+        const pdfHeight = 210; // A4 height in mm (landscape)
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+        const finalWidth = imgWidth * ratio;
+        const finalHeight = imgHeight * ratio;
+        
+        const pdf = new jsPDF({
+            orientation: finalWidth > finalHeight ? 'landscape' : 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+        
+        const x = (pdf.internal.pageSize.getWidth() - finalWidth) / 2;
+        const y = (pdf.internal.pageSize.getHeight() - finalHeight) / 2;
+        
+        pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+        pdf.save(`family-tree-${new Date().toISOString().split('T')[0]}.pdf`);
+        
+    } catch (error) {
+        console.error('Error exporting PDF:', error);
+        alert('Error exporting PDF. Please try again.');
+    }
+    
+    // Restore original transform
+    canvas.style.transform = originalTransform;
+    toggleBurgerMenu();
+}
+
+async function exportAsJPEG() {
+    const canvas = document.getElementById('treeCanvas');
+    
+    // Temporarily reset zoom and styling for export
+    const originalTransform = canvas.style.transform;
+    canvas.style.transform = 'scale(1)';
+    
+    try {
+        // Use html2canvas to capture the tree
+        const canvasElement = await html2canvas(canvas, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            useCORS: true
+        });
+        
+        // Convert to JPEG and download
+        canvasElement.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `family-tree-${new Date().toISOString().split('T')[0]}.jpg`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }, 'image/jpeg', 0.95);
+        
+    } catch (error) {
+        console.error('Error exporting JPEG:', error);
+        alert('Error exporting JPEG. Please try again.');
+    }
+    
+    // Restore original transform
+    canvas.style.transform = originalTransform;
+    toggleBurgerMenu();
 }
 
 async function importData(e) {

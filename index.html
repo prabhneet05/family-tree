@@ -7,10 +7,57 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Login Screen -->
-    <div id="loginScreen" class="login-container">
+    <!-- Tree Selector Screen -->
+    <div id="treeSelectorScreen" class="login-container">
+        <div class="selector-box">
+            <h2>🌳 Family Tree Manager</h2>
+            <p class="subtitle">Select or create a family tree</p>
+            
+            <div id="treeList" class="tree-list">
+                <!-- Trees will be populated here -->
+            </div>
+            
+            <button id="createNewTreeBtn" class="create-tree-btn">+ Create New Family Tree</button>
+        </div>
+    </div>
+
+    <!-- Create Tree Screen -->
+    <div id="createTreeScreen" class="login-container" style="display: none;">
         <div class="login-box">
-            <h2>Family Tree Login</h2>
+            <h2>Create New Family Tree</h2>
+            <form id="createTreeForm">
+                <div class="form-group">
+                    <label for="treeId">Tree ID (URL-friendly):</label>
+                    <input type="text" id="treeId" placeholder="e.g., smith-family" pattern="[a-z0-9-]+" required>
+                    <small>Only lowercase letters, numbers, and hyphens</small>
+                </div>
+                <div class="form-group">
+                    <label for="treeName">Display Name:</label>
+                    <input type="text" id="treeName" placeholder="e.g., Smith Family Tree" required>
+                </div>
+                <div class="form-group">
+                    <label for="newUsername">Username:</label>
+                    <input type="text" id="newUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Password:</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password:</label>
+                    <input type="password" id="confirmPassword" required>
+                </div>
+                <button type="submit">Create Tree</button>
+                <button type="button" id="backToSelector" class="secondary-btn">Back</button>
+                <div id="createError" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container" style="display: none;">
+        <div class="login-box">
+            <h2 id="loginTreeName">Family Tree Login</h2>
             <form id="loginForm">
                 <div class="form-group">
                     <label for="username">Username:</label>
@@ -21,6 +68,7 @@
                     <input type="password" id="password" required>
                 </div>
                 <button type="submit">Login</button>
+                <button type="button" id="backToTrees" class="secondary-btn">Back to Trees</button>
                 <div id="loginError" class="error-message"></div>
             </form>
         </div>
@@ -29,30 +77,47 @@
     <!-- Main Application -->
     <div id="mainApp" class="main-app" style="display: none;">
         <header>
-            <h1>Family Tree</h1>
-            <div class="header-controls">
-                <button id="exportBtn" class="btn btn-secondary">Export Data</button>
-                <button id="importBtn" class="btn btn-secondary">Import Data</button>
-                <button id="logoutBtn" class="btn btn-danger">Logout</button>
-            </div>
+            <h1>🌳 Family Tree</h1>
+            <button id="burgerBtn" class="burger-menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
         </header>
 
-        <div class="container">
-            <!-- Controls -->
-            <div class="controls">
-                <button id="expandAllBtn" class="btn">Expand All</button>
-                <button id="collapseAllBtn" class="btn">Collapse All</button>
-                <button id="zoomInBtn" class="btn">Zoom In (+)</button>
-                <button id="zoomOutBtn" class="btn">Zoom Out (−)</button>
-                <button id="resetZoomBtn" class="btn">Reset View</button>
-            </div>
+        <!-- Burger Menu Dropdown -->
+        <div id="burgerMenu" class="burger-dropdown">
+            <button id="exportJsonBtn" class="menu-item">📤 Export as JSON</button>
+            <button id="exportPdfBtn" class="menu-item">📝 Export as PDF</button>
+            <button id="exportJpegBtn" class="menu-item">🖼️ Export as JPEG</button>
+            <div class="menu-divider"></div>
+            <button id="importBtn" class="menu-item">📥 Import Data</button>
+            <div class="menu-divider"></div>
+            <button id="logoutBtn" class="menu-item danger">🚪 Logout</button>
+        </div>
 
+        <div class="container">
             <!-- Tree Container -->
             <div id="treeContainer" class="tree-container">
+                <!-- Expand/Collapse Controls -->
+                <div class="tree-controls">
+                    <button id="expandAllBtn" class="control-btn" title="Expand All">
+                        <span class="icon-expand">⊞</span>
+                    </button>
+                    <button id="collapseAllBtn" class="control-btn" title="Collapse All">
+                        <span class="icon-collapse">⊟</span>
+                    </button>
+                </div>
                 <div class="tree-wrapper">
                     <div id="treeCanvas" class="tree-canvas"></div>
                 </div>
             </div>
+        </div>
+
+        <!-- Bottom Right Zoom Controls -->
+        <div class="zoom-controls">
+            <button id="zoomInBtn" class="zoom-btn" title="Zoom In">+</button>
+            <button id="zoomOutBtn" class="zoom-btn" title="Zoom Out">−</button>
         </div>
     </div>
 
@@ -101,6 +166,10 @@
     <!-- Firebase SDK - Only App and Firestore needed (photos stored as base64) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <!-- Libraries for export functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <script src="script.js"></script>
 </body>
