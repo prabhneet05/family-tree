@@ -77,7 +77,9 @@
     <!-- Main Application -->
     <div id="mainApp" class="main-app" style="display: none;">
         <header>
-            <h1>🌳 Family Tree</h1>
+            <a href="javascript:void(0)" id="homeLink" class="home-link">
+                <h1>🌳 Family Tree</h1>
+            </a>
             <button id="burgerBtn" class="burger-menu">
                 <span></span>
                 <span></span>
@@ -163,9 +165,9 @@
     <!-- Hidden file input for import -->
     <input type="file" id="importFile" accept=".json" style="display: none;">
 
-    <!-- Firebase SDK - Only App and Firestore needed (photos stored as base64) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDK - Hosted locally to avoid tracking prevention issues -->
+    <script src="libs/firebase-app-compat.js"></script>
+    <script src="libs/firebase-firestore-compat.js"></script>
     
     <!-- Libraries for export functionality -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>

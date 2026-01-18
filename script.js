@@ -41,26 +41,94 @@ if (typeof firebase !== 'undefined') {
 // Multi-tree authentication - stored per tree
 const TREES_STORAGE_KEY = 'familyTreesAuth';
 
-function getTreeAuth(treeId) {
+async function getTreeAuth(treeId) {
+    console.log('Getting tree auth for:', treeId);
+    console.log('Firebase configured:', isFirebaseConfigured);
+    
+    // Try Firebase first
+    if (isFirebaseConfigured && db) {
+        try {
+            console.log('Querying Firebase for tree auth...');
+            const doc = await db.collection('treeAuth').doc(treeId).get();
+            console.log('Firebase doc exists:', doc.exists);
+            if (doc.exists) {
+                const authData = doc.data();
+                console.log('☁️ Tree auth loaded from cloud');
+                // Cache in localStorage for offline access
+                const trees = JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
+                trees[treeId] = authData;
+                localStorage.setItem(TREES_STORAGE_KEY, JSON.stringify(trees));
+                return authData;
+            }
+        } catch (error) {
+            console.warn('Error loading tree auth from Firebase:', error);
+        }
+    }
+    
+    // Fallback to localStorage
+    console.log('Checking localStorage for tree auth...');
     const trees = JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
-    return trees[treeId];
+    const localAuth = trees[treeId];
+    console.log('LocalStorage auth found:', !!localAuth);
+    return localAuth;
 }
 
-function saveTreeAuth(treeId, treeData) {
+async function saveTreeAuth(treeId, treeData) {
+    // Save to Firebase
+    if (isFirebaseConfigured && db) {
+        try {
+            await db.collection('treeAuth').doc(treeId).set(treeData);
+            console.log('☁️ Tree auth saved to cloud');
+        } catch (error) {
+            console.error('Error saving tree auth to Firebase:', error);
+        }
+    }
+    
+    // Also save to localStorage as backup
     const trees = JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
     trees[treeId] = treeData;
     localStorage.setItem(TREES_STORAGE_KEY, JSON.stringify(trees));
 }
 
-function getAllTrees() {
+async function getAllTrees() {
+    const allTrees = {};
+    
+    // Try Firebase first
+    if (isFirebaseConfigured && db) {
+        try {
+            const snapshot = await db.collection('treeAuth').get();
+            snapshot.forEach(doc => {
+                allTrees[doc.id] = doc.data();
+            });
+            
+            // Cache in localStorage
+            localStorage.setItem(TREES_STORAGE_KEY, JSON.stringify(allTrees));
+            return allTrees;
+        } catch (error) {
+            console.warn('Error loading trees from Firebase:', error);
+        }
+    }
+    
+    // Fallback to localStorage
     return JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
 }
 
-function deleteTree(treeId) {
+async function deleteTree(treeId) {
+    // Delete from Firebase
+    if (isFirebaseConfigured && db) {
+        try {
+            await db.collection('treeAuth').doc(treeId).delete();
+            await db.collection('familyTrees').doc(treeId).delete();
+            console.log('☁️ Tree deleted from cloud');
+        } catch (error) {
+            console.error('Error deleting tree from Firebase:', error);
+        }
+    }
+    
+    // Delete from localStorage
     const trees = JSON.parse(localStorage.getItem(TREES_STORAGE_KEY) || '{}');
     delete trees[treeId];
     localStorage.setItem(TREES_STORAGE_KEY, JSON.stringify(trees));
-    // Also delete tree data
     localStorage.removeItem(`familyTree_${treeId}`);
 }
 
@@ -142,7 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (treeIdFromUrl) {
         // Tree specified in URL - go to login
         familyTreeId = treeIdFromUrl;
-        currentTreeAuth = getTreeAuth(familyTreeId);
+        currentTreeAuth = await getTreeAuth(familyTreeId);
         
         console.log('Tree auth found:', currentTreeAuth);
         
@@ -188,6 +256,13 @@ function setupEventListeners() {
     document.getElementById('burgerBtn').addEventListener('click', toggleBurgerMenu);
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
     
+    // Home link
+    document.getElementById('homeLink').addEventListener('click', () => {
+        if (confirm('Return to tree selector? Make sure your changes are saved.')) {
+            window.location.href = window.location.pathname;
+        }
+    });
+    
     // Export Options
     document.getElementById('exportJsonBtn').addEventListener('click', exportData);
     document.getElementById('exportPdfBtn').addEventListener('click', exportAsPDF);
@@ -222,9 +297,11 @@ function setupEventListeners() {
 // ====================================================================
 // TREE MANAGEMENT
 // ====================================================================
-function populateTreeList() {
+async function populateTreeList() {
     const treeList = document.getElementById('treeList');
-    const trees = getAllTrees();
+    treeList.innerHTML = '<p class="no-trees">Loading trees...</p>';
+    
+    const trees = await getAllTrees();
     
     if (Object.keys(trees).length === 0) {
         treeList.innerHTML = '<p class="no-trees">No family trees yet. Create your first one!</p>';
@@ -262,14 +339,14 @@ function openTree(treeId) {
     window.location.href = `${window.location.pathname}?tree=${treeId}`;
 }
 
-function confirmDeleteTree(treeId, treeName) {
+async function confirmDeleteTree(treeId, treeName) {
     if (confirm(`Are you sure you want to delete "${treeName}"?\n\nThis will permanently delete all family data for this tree. This action cannot be undone.`)) {
-        deleteTree(treeId);
+        await deleteTree(treeId);
         populateTreeList();
     }
 }
 
-function handleCreateTree(e) {
+async function handleCreateTree(e) {
     e.preventDefault();
     const treeId = document.getElementById('treeId').value.toLowerCase().trim();
     const treeName = document.getElementById('treeName').value.trim();
@@ -295,14 +372,14 @@ function handleCreateTree(e) {
     }
     
     // Check if tree already exists
-    const existingTree = getTreeAuth(treeId);
+    const existingTree = await getTreeAuth(treeId);
     if (existingTree) {
         errorDiv.textContent = 'A tree with this ID already exists. Please choose a different ID.';
         return;
     }
     
     // Create tree
-    saveTreeAuth(treeId, {
+    await saveTreeAuth(treeId, {
         name: treeName,
         username: username,
         password: password,
@@ -1011,9 +1088,15 @@ async function saveData() {
 
 // Load data from Firebase or localStorage
 async function loadData() {
+    console.log('Loading data for tree:', familyTreeId);
+    console.log('Firebase configured:', isFirebaseConfigured);
+    console.log('DB instance:', db ? 'available' : 'null');
+    
     if (isFirebaseConfigured && db) {
         try {
+            console.log('Attempting to load from Firebase...');
             const doc = await db.collection('familyTrees').doc(familyTreeId).get();
+            console.log('Firebase doc exists:', doc.exists);
             if (doc.exists) {
                 const cloudData = doc.data();
                 familyData = cloudData.data;
@@ -1028,6 +1111,8 @@ async function loadData() {
         } catch (error) {
             console.error('Error loading from Firebase:', error);
         }
+    } else {
+        console.log('Firebase not available, using localStorage');
     }
     
     // Fallback to localStorage

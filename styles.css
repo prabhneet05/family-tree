@@ -274,6 +274,17 @@ header h1 {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     letter-spacing: -0.5px;
+    margin: 0;
+}
+
+.home-link {
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.home-link:hover {
+    transform: scale(1.05);
 }
 
 /* Burger Menu */
